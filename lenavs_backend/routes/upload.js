@@ -1,23 +1,36 @@
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
+import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { authenticate } from '../middleware/auth.js';
 import { processLyricsFile } from '../utils/lyricsProcessor.js';
 
 const router = express.Router();
 
+// 🔥 Função que garante que a pasta existe
+function ensureFolder(folder) {
+  if (!fs.existsSync(folder)) {
+    fs.mkdirSync(folder, { recursive: true });
+  }
+}
+
 // Configure multer storage
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const type = req.body.type || 'general';
+
     let folder = 'uploads/';
-    
+
     if (type === 'audio') folder += 'audio/';
     else if (type === 'video') folder += 'video/';
     else if (type === 'image') folder += 'images/';
     else if (type === 'lyrics') folder += 'lyrics/';
-    
+    else folder += 'general/';
+
+    // 🔥 Cria a pasta se não existir (Render não cria)
+    ensureFolder(folder);
+
     cb(null, folder);
   },
   filename: (req, file, cb) => {
@@ -41,7 +54,7 @@ const upload = multer({
 
     const type = req.body.type;
     const ext = path.extname(file.originalname).toLowerCase().slice(1);
-    
+
     if (allowedTypes[type]?.test(ext)) {
       cb(null, true);
     } else {
@@ -50,7 +63,7 @@ const upload = multer({
   }
 });
 
-// Upload audio (original or instrumental)
+// Upload audio
 router.post('/audio', authenticate, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -67,6 +80,7 @@ router.post('/audio', authenticate, upload.single('file'), async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Erro em /upload/audio:', error);
     res.status(500).json({ error: 'Erro ao fazer upload do áudio' });
   }
 });
@@ -91,6 +105,7 @@ router.post('/media', authenticate, upload.single('file'), async (req, res) => {
       }
     });
   } catch (error) {
+    console.error('Erro em /upload/media:', error);
     res.status(500).json({ error: 'Erro ao fazer upload da mídia' });
   }
 });
@@ -102,7 +117,6 @@ router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => 
       return res.status(400).json({ error: 'Nenhum arquivo enviado' });
     }
 
-    // Process lyrics file
     const lyrics = await processLyricsFile(req.file.path, req.file.mimetype);
 
     res.json({
@@ -115,6 +129,7 @@ router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => 
       lyrics
     });
   } catch (error) {
+    console.error('Erro em /upload/lyrics:', error);
     res.status(500).json({ error: 'Erro ao processar letra' });
   }
 });
@@ -128,7 +143,6 @@ router.post('/lyrics/text', authenticate, async (req, res) => {
       return res.status(400).json({ error: 'Texto da letra não fornecido' });
     }
 
-    // Split into verses
     const verses = text.split(/\n\s*\n/).filter(v => v.trim());
 
     res.json({
@@ -140,6 +154,7 @@ router.post('/lyrics/text', authenticate, async (req, res) => {
       }))
     });
   } catch (error) {
+    console.error('Erro em /upload/lyrics/text:', error);
     res.status(500).json({ error: 'Erro ao processar letra' });
   }
 });
