@@ -8,31 +8,44 @@ import { processLyricsFile } from '../utils/lyricsProcessor.js';
 
 const router = express.Router();
 
-// 🔥 Função que garante que a pasta existe
+// Garante que a pasta existe
 function ensureFolder(folder) {
   if (!fs.existsSync(folder)) {
     fs.mkdirSync(folder, { recursive: true });
   }
 }
 
-// Configure multer storage
+// Tipos aceitos
+const allowedTypes = {
+  audio: /mp3|wav|ogg|m4a|aac|flac|wma/,
+  video: /mp4|mov|avi|mkv/,
+  image: /jpg|jpeg|png/,
+  lyrics: /txt|docx|pdf/
+};
+
+// FUNÇÃO QUE DETECTA O TIPO PELA ROTA (CORREÇÃO PRINCIPAL)
+function getUploadType(req) {
+  if (req.path.includes("audio")) return "audio";
+  if (req.path.includes("media")) return req.body.type; // video ou image
+  if (req.path.includes("lyrics")) return "lyrics";
+  return "general";
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const type = req.body.type || 'general';
+    const type = getUploadType(req);
 
-    let folder = 'uploads/';
+    let folder = "uploads/";
+    if (type === "audio") folder += "audio/";
+    else if (type === "video") folder += "video/";
+    else if (type === "image") folder += "images/";
+    else if (type === "lyrics") folder += "lyrics/";
+    else folder += "general/";
 
-    if (type === 'audio') folder += 'audio/';
-    else if (type === 'video') folder += 'video/';
-    else if (type === 'image') folder += 'images/';
-    else if (type === 'lyrics') folder += 'lyrics/';
-    else folder += 'general/';
-
-    // 🔥 Cria a pasta se não existir (Render não cria)
     ensureFolder(folder);
-
     cb(null, folder);
   },
+
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`;
     cb(null, uniqueName);
@@ -41,34 +54,29 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: {
-    fileSize: 500 * 1024 * 1024 // 500MB
-  },
+  limits: { fileSize: 500 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = {
-      audio: /mp3|wav|ogg|m4a|aac|flac|wma/,
-      video: /mp4|mov|avi|mkv/,
-      image: /jpg|jpeg|png/,
-      lyrics: /txt|docx|pdf/
-    };
-
-    const type = req.body.type;
+    const type = getUploadType(req);
     const ext = path.extname(file.originalname).toLowerCase().slice(1);
 
-    if (allowedTypes[type]?.test(ext)) {
-      cb(null, true);
-    } else {
-      cb(new Error(`Tipo de arquivo não suportado para ${type}`));
+    if (!allowedTypes[type]) {
+      return cb(new Error(`Tipo de upload desconhecido: ${type}`));
     }
+
+    if (!allowedTypes[type].test(ext)) {
+      return cb(new Error(`Tipo de arquivo não suportado para ${type}`));
+    }
+
+    cb(null, true);
   }
 });
 
-// Upload audio
-router.post('/audio', authenticate, upload.single('file'), async (req, res) => {
+// ===== ROTAS =====
+
+// AUDIO
+router.post('/audio', authenticate, upload.single('file'), (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-    }
+    if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
     res.json({
       success: true,
@@ -80,19 +88,17 @@ router.post('/audio', authenticate, upload.single('file'), async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Erro em /upload/audio:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload do áudio' });
+    console.error("Erro em /upload/audio:", error);
+    res.status(500).json({ error: "Erro ao enviar áudio" });
   }
 });
 
-// Upload video/image
-router.post('/media', authenticate, upload.single('file'), async (req, res) => {
+// VIDEO / IMAGE
+router.post('/media', authenticate, upload.single('file'), (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-    }
+    if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
-    const type = req.body.type === 'video' ? 'video' : 'images';
+    const type = req.body.type === "video" ? "video" : "images";
 
     res.json({
       success: true,
@@ -101,21 +107,19 @@ router.post('/media', authenticate, upload.single('file'), async (req, res) => {
         path: `/uploads/${type}/${req.file.filename}`,
         originalName: req.file.originalname,
         size: req.file.size,
-        type: req.body.type
+        type
       }
     });
   } catch (error) {
-    console.error('Erro em /upload/media:', error);
-    res.status(500).json({ error: 'Erro ao fazer upload da mídia' });
+    console.error("Erro em /upload/media:", error);
+    res.status(500).json({ error: "Erro ao enviar mídia" });
   }
 });
 
-// Upload lyrics file
+// LETRA (arquivo)
 router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-    }
+    if (!req.file) return res.status(400).json({ error: "Nenhum arquivo enviado" });
 
     const lyrics = await processLyricsFile(req.file.path, req.file.mimetype);
 
@@ -129,19 +133,16 @@ router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => 
       lyrics
     });
   } catch (error) {
-    console.error('Erro em /upload/lyrics:', error);
-    res.status(500).json({ error: 'Erro ao processar letra' });
+    console.error("Erro em /upload/lyrics:", error);
+    res.status(500).json({ error: "Erro ao processar letra" });
   }
 });
 
-// Upload lyrics as text
-router.post('/lyrics/text', authenticate, async (req, res) => {
+// LETRA (TEXTO)
+router.post('/lyrics/text', authenticate, (req, res) => {
   try {
     const { text } = req.body;
-
-    if (!text) {
-      return res.status(400).json({ error: 'Texto da letra não fornecido' });
-    }
+    if (!text) return res.status(400).json({ error: "Texto não enviado" });
 
     const verses = text.split(/\n\s*\n/).filter(v => v.trim());
 
@@ -154,8 +155,8 @@ router.post('/lyrics/text', authenticate, async (req, res) => {
       }))
     });
   } catch (error) {
-    console.error('Erro em /upload/lyrics/text:', error);
-    res.status(500).json({ error: 'Erro ao processar letra' });
+    console.error("Erro em /upload/lyrics/text:", error);
+    res.status(500).json({ error: "Erro ao processar letra" });
   }
 });
 
