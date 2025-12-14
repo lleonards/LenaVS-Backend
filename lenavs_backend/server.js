@@ -1,28 +1,31 @@
-import express from 'express';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
+import express from 'express'
+import cors from 'cors'
+import dotenv from 'dotenv'
+import path from 'path'
+import fs from 'fs'
 
-import authRoutes from './routes/auth.js';
-import uploadRoutes from './routes/upload.js';
-import projectRoutes from './routes/projects.js';
-import exportRoutes from './routes/export.js';
-import paymentRoutes from './routes/payment.js';
-import reportRoutes from './routes/report.js';
+// Routes
+import authRoutes from './routes/auth.js'
+import uploadRoutes from './routes/upload.js'
+import projectRoutes from './routes/projects.js'
+import exportRoutes from './routes/export.js'
+import paymentRoutes from './routes/payment.js'
+import reportRoutes from './routes/report.js'
 
-import { errorHandler } from './middleware/errorHandler.js';
+// Middlewares
+import { errorHandler } from './middleware/errorHandler.js'
 
-dotenv.config();
+dotenv.config()
 
-const app = express();
-const PORT = process.env.PORT || 10000;
+const app = express()
+const PORT = process.env.PORT || 10000
 
-const __dirname = path.resolve();
+// Resolve __dirname (ESM safe)
+const __dirname = path.resolve()
 
-// -----------------------------
-// CREATE UPLOAD FOLDERS SAFELY
-// -----------------------------
+// --------------------------------------------------
+// CREATE UPLOAD / EXPORT FOLDERS SAFELY
+// --------------------------------------------------
 function ensureUploadStructure() {
   const folders = [
     path.join(__dirname, 'uploads'),
@@ -31,68 +34,78 @@ function ensureUploadStructure() {
     path.join(__dirname, 'uploads/images'),
     path.join(__dirname, 'uploads/lyrics'),
     path.join(__dirname, 'exports'),
-  ];
+  ]
 
-  for (const folder of folders) {
+  folders.forEach((folder) => {
     if (!fs.existsSync(folder)) {
-      fs.mkdirSync(folder, { recursive: true });
-      console.log('📁 Created folder:', folder);
-    } else {
-      console.log('📁 Folder already exists:', folder);
+      fs.mkdirSync(folder, { recursive: true })
+      console.log('📁 Created folder:', folder)
     }
-  }
+  })
 }
 
-ensureUploadStructure();
+ensureUploadStructure()
 
-// -----------------------------
-// MIDDLEWARE
-// -----------------------------
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true
-}));
+// --------------------------------------------------
+// MIDDLEWARES
+// --------------------------------------------------
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
+  })
+)
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
-// -----------------------------
-// STATIC FILE HOSTING
-// -----------------------------
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-app.use('/exports', express.static(path.join(__dirname, 'exports')));
+// --------------------------------------------------
+// STATIC FILES
+// --------------------------------------------------
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+app.use('/exports', express.static(path.join(__dirname, 'exports')))
 
-// -----------------------------
-// HEALTHCHECK
-// -----------------------------
+// --------------------------------------------------
+// HEALTH CHECK
+// --------------------------------------------------
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', message: 'LenaVS Backend is running' });
-});
+  res.status(200).json({
+    status: 'ok',
+    service: 'LenaVS Backend',
+    timestamp: new Date().toISOString(),
+  })
+})
 
-// -----------------------------
-// ROUTES
-// -----------------------------
-app.use('/api/auth', authRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/projects', projectRoutes);
-app.use('/api/export', exportRoutes);
-app.use('/api/payment', paymentRoutes);
-app.use('/api/report', reportRoutes);
+// --------------------------------------------------
+// API ROUTES
+// --------------------------------------------------
+app.use('/api/auth', authRoutes)
+app.use('/api/upload', uploadRoutes)
+app.use('/api/projects', projectRoutes)
+app.use('/api/export', exportRoutes)
+app.use('/api/payment', paymentRoutes)
+app.use('/api/report', reportRoutes)
 
-// -----------------------------
-// GLOBAL ERRORS
-// -----------------------------
-app.use(errorHandler);
-
-// 404 handler
+// --------------------------------------------------
+// 404 HANDLER
+// --------------------------------------------------
 app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
-});
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.originalUrl,
+  })
+})
 
-// -----------------------------
+// --------------------------------------------------
+// GLOBAL ERROR HANDLER
+// --------------------------------------------------
+app.use(errorHandler)
+
+// --------------------------------------------------
 // START SERVER
-// -----------------------------
+// --------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 LenaVS Backend running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
+  console.log('🚀 LenaVS Backend running')
+  console.log(`🌍 Port: ${PORT}`)
+  console.log(`⚙️ Environment: ${process.env.NODE_ENV || 'development'}`)
+})
