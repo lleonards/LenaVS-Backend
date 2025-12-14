@@ -1,128 +1,114 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { users } from '../data/store.js';
+import express from 'express'
+import bcrypt from 'bcryptjs'
+import jwt from 'jsonwebtoken'
+import { supabase } from '../lib/supabaseClient.js'
 
-const router = express.Router();
+const router = express.Router()
 
-// Register
+// ------------------------------------
+// REGISTER
+// ------------------------------------
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, confirmPassword } = req.body
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Todos os campos são obrigatórios' });
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({ error: 'Missing required fields' })
     }
 
-    // Check if user exists
-    const userExists = users.find(u => u.email === email);
-    if (userExists) {
-      return res.status(400).json({ error: 'Email já cadastrado' });
+    if (password !== confirmPassword) {
+      return res.status(400).json({ error: 'Passwords do not match' })
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 1️⃣ Create user in Supabase Auth
+    const { data: authData, error: authError } =
+      await supabase.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      })
 
-    // Create user
-    const newUser = {
-      id: Date.now().toString(),
-      name,
-      email,
-      password: hashedPassword,
-      createdAt: new Date().toISOString()
-    };
+    if (authError) {
+      return res.status(400).json({ error: authError.message })
+    }
 
-    users.push(newUser);
+    const userId = authData.user.id
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: newUser.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
+    // 2️⃣ Create user in database
+    const trialEndsAt = new Date()
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    res.status(201).json({
-      message: 'Conta criada com sucesso',
-      token,
+    const { error: dbError } = await supabase.from('users').insert([
+      {
+        id: userId,
+        email,
+        name,
+        plan: 'trial',
+        active: true,
+        trial_ends_at: trialEndsAt.toISOString(),
+      },
+    ])
+
+    if (dbError) {
+      return res.status(400).json({ error: dbError.message })
+    }
+
+    return res.status(201).json({
+      message: 'User registered successfully',
       user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao criar conta' });
+        id: userId,
+        email,
+        name,
+        plan: 'trial',
+        trial_ends_at: trialEndsAt,
+      },
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
   }
-});
+})
 
-// Login
+// ------------------------------------
+// LOGIN
+// ------------------------------------
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password } = req.body
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email e senha são obrigatórios' });
+      return res.status(400).json({ error: 'Missing email or password' })
     }
 
-    // Find user
-    const user = users.find(u => u.email === email);
-    if (!user) {
-      return res.status(401).json({ error: 'Email ou senha incorretos' });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (error) {
+      return res.status(401).json({ error: 'Invalid credentials' })
     }
 
-    // Check password
-    const isValidPassword = await bcrypt.compare(password, user.password);
-    if (!isValidPassword) {
-      return res.status(401).json({ error: 'Email ou senha incorretos' });
+    const userId = data.user.id
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (userError) {
+      return res.status(400).json({ error: userError.message })
     }
 
-    // Generate token
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({
-      message: 'Login realizado com sucesso',
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao fazer login' });
+    return res.json({
+      user: userData,
+      session: data.session,
+    })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
   }
-});
+})
 
-// Verify token
-router.get('/verify', async (req, res) => {
-  try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = users.find(u => u.id === decoded.userId);
-
-    if (!user) {
-      return res.status(401).json({ error: 'Usuário não encontrado' });
-    }
-
-    res.json({
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email
-      }
-    });
-  } catch (error) {
-    res.status(401).json({ error: 'Token inválido' });
-  }
-});
-
-export default router;
+export default router
