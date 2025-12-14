@@ -3,9 +3,9 @@ import { supabase } from '../utils/supabaseClient.js'
 
 const router = express.Router()
 
-// ------------------------------------
+// =====================================================
 // REGISTER
-// ------------------------------------
+// =====================================================
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, confirmPassword } = req.body
@@ -18,25 +18,27 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Passwords do not match' })
     }
 
-    // 1️⃣ Create user in Supabase Auth
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true
-      })
+    // 1️⃣ Criar usuário no Supabase Auth (SIGN UP NORMAL)
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password
+    })
 
-    if (authError) {
-      return res.status(400).json({ error: authError.message })
+    if (error) {
+      return res.status(400).json({ error: error.message })
     }
 
-    const userId = authData.user.id
+    if (!data.user) {
+      return res.status(400).json({ error: 'User not created' })
+    }
 
-    // 2️⃣ Trial: 7 days
+    const userId = data.user.id
+
+    // 2️⃣ Trial de 7 dias
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    // 3️⃣ Create user in DB
+    // 3️⃣ Criar usuário na tabela users
     const { error: dbError } = await supabase.from('users').insert([
       {
         id: userId,
@@ -52,8 +54,16 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: dbError.message })
     }
 
+    // 4️⃣ Retornar usuário + sessão
     return res.status(201).json({
-      message: 'User registered successfully'
+      user: {
+        id: userId,
+        email,
+        name,
+        plan: 'trial',
+        trial_ends_at: trialEndsAt
+      },
+      session: data.session
     })
   } catch (err) {
     console.error(err)
@@ -61,9 +71,9 @@ router.post('/register', async (req, res) => {
   }
 })
 
-// ------------------------------------
+// =====================================================
 // LOGIN
-// ------------------------------------
+// =====================================================
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body
@@ -103,9 +113,9 @@ router.post('/login', async (req, res) => {
   }
 })
 
-// ------------------------------------
-// GET CURRENT USER  (/api/auth/me)
-// ------------------------------------
+// =====================================================
+// GET CURRENT USER (/api/auth/me)
+// =====================================================
 router.get('/me', async (req, res) => {
   try {
     const authHeader = req.headers.authorization
