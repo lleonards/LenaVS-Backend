@@ -1,7 +1,5 @@
 import express from 'express'
-import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
-import { supabase } from '../lib/supabaseClient.js'
+import { supabase } from '../utils/supabaseClient.js'
 
 const router = express.Router()
 
@@ -25,7 +23,7 @@ router.post('/register', async (req, res) => {
       await supabase.auth.admin.createUser({
         email,
         password,
-        email_confirm: true,
+        email_confirm: true
       })
 
     if (authError) {
@@ -34,10 +32,11 @@ router.post('/register', async (req, res) => {
 
     const userId = authData.user.id
 
-    // 2️⃣ Create user in database
+    // 2️⃣ Trial: 7 days
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
+    // 3️⃣ Create user in DB
     const { error: dbError } = await supabase.from('users').insert([
       {
         id: userId,
@@ -45,8 +44,8 @@ router.post('/register', async (req, res) => {
         name,
         plan: 'trial',
         active: true,
-        trial_ends_at: trialEndsAt.toISOString(),
-      },
+        trial_ends_at: trialEndsAt.toISOString()
+      }
     ])
 
     if (dbError) {
@@ -54,14 +53,7 @@ router.post('/register', async (req, res) => {
     }
 
     return res.status(201).json({
-      message: 'User registered successfully',
-      user: {
-        id: userId,
-        email,
-        name,
-        plan: 'trial',
-        trial_ends_at: trialEndsAt,
-      },
+      message: 'User registered successfully'
     })
   } catch (err) {
     console.error(err)
@@ -82,7 +74,7 @@ router.post('/login', async (req, res) => {
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
-      password,
+      password
     })
 
     if (error) {
@@ -103,8 +95,45 @@ router.post('/login', async (req, res) => {
 
     return res.json({
       user: userData,
-      session: data.session,
+      session: data.session
     })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: 'Internal server error' })
+  }
+})
+
+// ------------------------------------
+// GET CURRENT USER  (/api/auth/me)
+// ------------------------------------
+router.get('/me', async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization
+
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Missing token' })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+
+    const { data: authData, error: authError } =
+      await supabase.auth.getUser(token)
+
+    if (authError || !authData.user) {
+      return res.status(401).json({ error: 'Invalid token' })
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single()
+
+    if (userError || !user) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    return res.json({ user })
   } catch (err) {
     console.error(err)
     res.status(500).json({ error: 'Internal server error' })
