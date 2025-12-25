@@ -22,26 +22,53 @@ router.post('/register', async (req, res) => {
       })
     }
 
-    // 1️⃣ Tentar criar usuário no Supabase Auth
+    // 1️⃣ Criar usuário no Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password
     })
 
-    // 🔴 EMAIL JÁ CADASTRADO (SUPABASE NÃO RETORNA ERRO CLARO)
-    if (error || !data?.user) {
+    if (error) {
+      // email já cadastrado
+      if (error.message?.toLowerCase().includes('already')) {
+        return res.status(409).json({
+          message: 'Este email já está cadastrado'
+        })
+      }
+
       return res.status(400).json({
-        message: 'Este email já está cadastrado. Faça login.'
+        message: error.message
+      })
+    }
+
+    if (!data?.user) {
+      return res.status(400).json({
+        message: 'Usuário não criado'
       })
     }
 
     const userId = data.user.id
 
-    // 2️⃣ Trial de 7 dias
+    // 2️⃣ Verificar se já existe na tabela users
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (existingUser) {
+      // Usuário já existe → sucesso
+      return res.status(201).json({
+        user: existingUser,
+        session: data.session
+      })
+    }
+
+    // 3️⃣ Trial de 7 dias
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    // 3️⃣ Inserir usuário na tabela users
+    // 4️⃣ Inserir na tabela users
     const { error: dbError } = await supabase
       .from('users')
       .insert({
@@ -54,12 +81,13 @@ router.post('/register', async (req, res) => {
       })
 
     if (dbError) {
-      console.error(dbError)
+      console.error('DB ERROR:', dbError)
       return res.status(500).json({
         message: 'Erro ao salvar usuário'
       })
     }
 
+    // 5️⃣ Sucesso
     return res.status(201).json({
       user: {
         id: userId,
@@ -91,41 +119,16 @@ router.post('/login', async (req, res) => {
       })
     }
 
+    // 1️⃣ Login no Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
     })
 
-    if (error) {
+    if (error || !data?.user) {
       return res.status(401).json({
         message: 'Email ou senha inválidos'
       })
     }
 
-    const userId = data.user.id
-
-    const { data: userData, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .single()
-
-    if (userError || !userData) {
-      return res.status(404).json({
-        message: 'Usuário não encontrado'
-      })
-    }
-
-    return res.json({
-      user: userData,
-      session: data.session
-    })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({
-      message: 'Erro interno do servidor'
-    })
-  }
-})
-
-export default router
+    const use
