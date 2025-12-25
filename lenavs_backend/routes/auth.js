@@ -28,15 +28,17 @@ router.post('/register', async (req, res) => {
       password
     })
 
+    // 🔴 EMAIL JÁ CADASTRADO NO AUTH
     if (error) {
-      if (error.message?.toLowerCase().includes('already')) {
+      if (error.status === 422) {
         return res.status(400).json({
           message: 'Este email já está cadastrado. Faça login.'
         })
       }
 
+      console.error(error)
       return res.status(400).json({
-        message: 'Erro ao criar usuário'
+        message: 'Erro ao criar conta'
       })
     }
 
@@ -64,6 +66,7 @@ router.post('/register', async (req, res) => {
         trial_ends_at: trialEndsAt.toISOString()
       })
 
+    // 🔴 EMAIL / ID JÁ EXISTE NO BANCO
     if (dbError) {
       if (dbError.code === '23505') {
         return res.status(400).json({
@@ -137,51 +140,6 @@ router.post('/login', async (req, res) => {
       user: userData,
       session: data.session
     })
-  } catch (err) {
-    console.error(err)
-    return res.status(500).json({
-      message: 'Erro interno do servidor'
-    })
-  }
-})
-
-// =====================================================
-// GET CURRENT USER
-// =====================================================
-router.get('/me', async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization
-
-    if (!authHeader) {
-      return res.status(401).json({
-        message: 'Token não fornecido'
-      })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-
-    const { data: authData, error: authError } =
-      await supabase.auth.getUser(token)
-
-    if (authError || !authData?.user) {
-      return res.status(401).json({
-        message: 'Token inválido'
-      })
-    }
-
-    const { data: user, error: userError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', authData.user.id)
-      .single()
-
-    if (userError || !user) {
-      return res.status(404).json({
-        message: 'Usuário não encontrado'
-      })
-    }
-
-    return res.json({ user })
   } catch (err) {
     console.error(err)
     return res.status(500).json({
