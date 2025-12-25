@@ -22,29 +22,16 @@ router.post('/register', async (req, res) => {
       })
     }
 
-    // 1️⃣ Criar usuário no Supabase Auth
+    // 1️⃣ Tentar criar usuário no Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password
     })
 
-    // 🔴 EMAIL JÁ CADASTRADO NO AUTH
-    if (error) {
-      if (error.status === 422) {
-        return res.status(400).json({
-          message: 'Este email já está cadastrado. Faça login.'
-        })
-      }
-
-      console.error(error)
+    // 🔴 EMAIL JÁ CADASTRADO (SUPABASE NÃO RETORNA ERRO CLARO)
+    if (error || !data?.user) {
       return res.status(400).json({
-        message: 'Erro ao criar conta'
-      })
-    }
-
-    if (!data?.user) {
-      return res.status(400).json({
-        message: 'Usuário não foi criado'
+        message: 'Este email já está cadastrado. Faça login.'
       })
     }
 
@@ -66,14 +53,7 @@ router.post('/register', async (req, res) => {
         trial_ends_at: trialEndsAt.toISOString()
       })
 
-    // 🔴 EMAIL / ID JÁ EXISTE NO BANCO
     if (dbError) {
-      if (dbError.code === '23505') {
-        return res.status(400).json({
-          message: 'Este email já está cadastrado. Faça login.'
-        })
-      }
-
       console.error(dbError)
       return res.status(500).json({
         message: 'Erro ao salvar usuário'
