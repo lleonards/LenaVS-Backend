@@ -11,15 +11,11 @@ router.post('/register', async (req, res) => {
     const { name, email, password, confirmPassword } = req.body
 
     if (!name || !email || !password || !confirmPassword) {
-      return res.status(400).json({
-        message: 'Preencha todos os campos'
-      })
+      return res.status(400).json({ message: 'Preencha todos os campos' })
     }
 
     if (password !== confirmPassword) {
-      return res.status(400).json({
-        message: 'As senhas não coincidem'
-      })
+      return res.status(400).json({ message: 'As senhas não coincidem' })
     }
 
     // 1️⃣ Criar usuário no Supabase Auth
@@ -29,22 +25,17 @@ router.post('/register', async (req, res) => {
     })
 
     if (error) {
-      // email já cadastrado
       if (error.message?.toLowerCase().includes('already')) {
         return res.status(409).json({
           message: 'Este email já está cadastrado'
         })
       }
 
-      return res.status(400).json({
-        message: error.message
-      })
+      return res.status(400).json({ message: error.message })
     }
 
     if (!data?.user) {
-      return res.status(400).json({
-        message: 'Usuário não criado'
-      })
+      return res.status(400).json({ message: 'Usuário não criado' })
     }
 
     const userId = data.user.id
@@ -57,7 +48,6 @@ router.post('/register', async (req, res) => {
       .single()
 
     if (existingUser) {
-      // Usuário já existe → sucesso
       return res.status(201).json({
         user: existingUser,
         session: data.session
@@ -68,7 +58,7 @@ router.post('/register', async (req, res) => {
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    // 4️⃣ Inserir na tabela users
+    // 4️⃣ Inserir usuário na tabela users
     const { error: dbError } = await supabase
       .from('users')
       .insert({
@@ -81,13 +71,12 @@ router.post('/register', async (req, res) => {
       })
 
     if (dbError) {
-      console.error('DB ERROR:', dbError)
+      console.error(dbError)
       return res.status(500).json({
         message: 'Erro ao salvar usuário'
       })
     }
 
-    // 5️⃣ Sucesso
     return res.status(201).json({
       user: {
         id: userId,
@@ -100,9 +89,7 @@ router.post('/register', async (req, res) => {
     })
   } catch (err) {
     console.error(err)
-    return res.status(500).json({
-      message: 'Erro interno do servidor'
-    })
+    return res.status(500).json({ message: 'Erro interno do servidor' })
   }
 })
 
@@ -119,7 +106,6 @@ router.post('/login', async (req, res) => {
       })
     }
 
-    // 1️⃣ Login no Supabase Auth
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -131,4 +117,28 @@ router.post('/login', async (req, res) => {
       })
     }
 
-    const use
+    const userId = data.user.id
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        message: 'Usuário não encontrado'
+      })
+    }
+
+    return res.json({
+      user: userData,
+      session: data.session
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({ message: 'Erro interno do servidor' })
+  }
+})
+
+export default router
