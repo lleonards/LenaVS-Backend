@@ -1,17 +1,131 @@
-import jwt from 'jsonwebtoken';
+import express from 'express'
+import { supabase } from '../utils/supabaseClient.js'
 
-export const authenticate = (req, res, next) => {
+const router = express.Router()
+
+// =====================================================
+// REGISTER
+// =====================================================
+router.post('/register', async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Token não fornecido' });
+    const { name, email, password, confirmPassword } = req.body
+
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({
+        message: 'Preencha todos os campos'
+      })
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
-    next();
-  } catch (error) {
-    return res.status(401).json({ error: 'Token inválido ou expirado' });
+    if (password !== confirmPassword) {
+      return res.status(400).json({
+        message: 'As senhas não coincidem'
+      })
+    }
+
+    // 1️⃣ Criar usuário no Supabase Auth
+    const { data, error } = await supabase.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true
+    })
+
+    if (error || !data?.user) {
+      console.error(error)
+      return res.status(400).json({
+        message: 'Este email já está cadastrado'
+      })
+    }
+
+    const userId = data.user.id
+
+    // 2️⃣ Trial de 7 dias
+    const trialEndsAt = new Date()
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7)
+
+    // 3️⃣ Inserir usuário na tabela users
+    const { error: dbError } = await supabase
+      .from('users')
+      .insert({
+        id: userId,
+        email,
+        name,
+        plan: 'trial',
+        active: true,
+        trial_ends_at: trialEndsAt.toISOString()
+      })
+
+    if (dbError) {
+      console.error(dbError)
+      return res.status(500).json({
+        message: 'Erro ao salvar usuário'
+      })
+    }
+
+    return res.status(201).json({
+      user: {
+        id: userId,
+        email,
+        name,
+        plan: 'trial',
+        trial_ends_at: trialEndsAt
+      }
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({
+      message: 'Erro interno do servidor'
+    })
   }
-};
+})
+
+// =====================================================
+// LOGIN
+// =====================================================
+router.post('/login', async (req, res) => {
+  try {
+    const { email, password } = req.body
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message: 'Email e senha são obrigatórios'
+      })
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error || !data?.user) {
+      return res.status(401).json({
+        message: 'Email ou senha inválidos'
+      })
+    }
+
+    const userId = data.user.id
+
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userData) {
+      return res.status(404).json({
+        message: 'Usuário não encontrado'
+      })
+    }
+
+    return res.json({
+      user: userData,
+      session: data.session
+    })
+  } catch (err) {
+    console.error(err)
+    return res.status(500).json({
+      message: 'Erro interno do servidor'
+    })
+  }
+})
+
+export default router
