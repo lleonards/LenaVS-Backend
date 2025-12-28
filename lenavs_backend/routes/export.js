@@ -1,5 +1,5 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
+import { authenticate } from '../middleware/auth.js'
 import { generateVideo } from '../utils/videoGenerator.js'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -8,21 +8,20 @@ const router = express.Router()
 // =====================================================
 // EXPORT VIDEO
 // =====================================================
-router.post('/video', authMiddleware, async (req, res) => {
+router.post('/video', authenticate, async (req, res) => {
   try {
     const {
       projectName,
-      audioType, // 'original' or 'instrumental'
+      audioType,
       audioOriginalPath,
       audioInstrumentalPath,
       backgroundPath,
-      backgroundType, // 'video' or 'image'
+      backgroundType,
       backgroundColor,
       verses,
       videoDuration
     } = req.body
 
-    // Validações básicas
     if (!projectName) {
       return res.status(400).json({ error: 'Nome do projeto é obrigatório' })
     }
@@ -40,10 +39,9 @@ router.post('/video', authMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Letras não fornecidas' })
     }
 
-    // Nome único do arquivo final
-    const outputFilename = `${projectName.replace(/[^a-z0-9]/gi, '_')}_${uuidv4()}.mp4`
+    const outputFilename =
+      `${projectName.replace(/[^a-z0-9]/gi, '_')}_${uuidv4()}.mp4`
 
-    // Geração do vídeo
     const videoPath = await generateVideo({
       outputFilename,
       audioPath,
@@ -70,17 +68,17 @@ router.post('/video', authMiddleware, async (req, res) => {
 })
 
 // =====================================================
-// EXPORT STATUS (FUTURO / PLACEHOLDER)
+// EXPORT STATUS (PLACEHOLDER)
 // =====================================================
-router.get('/status/:jobId', authMiddleware, async (req, res) => {
+router.get('/status/:jobId', authenticate, async (req, res) => {
   try {
-    res.json({
+    return res.json({
       success: true,
       status: 'completed',
       progress: 100
     })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao verificar status' })
+    return res.status(500).json({ error: 'Erro ao verificar status' })
   }
 })
 
