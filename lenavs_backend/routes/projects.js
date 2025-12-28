@@ -1,206 +1,223 @@
-import express from 'express';
-import { authenticate } from '../middleware/auth.js';
-import { projects, publicProjects } from '../data/store.js';
-import { v4 as uuidv4 } from 'uuid';
+import express from 'express'
+import authMiddleware from '../middleware/auth.js'
+import { projects, publicProjects } from '../data/store.js'
+import { v4 as uuidv4 } from 'uuid'
 
-const router = express.Router();
+const router = express.Router()
 
-// Create project
-router.post('/', authenticate, async (req, res) => {
+// =====================================================
+// CREATE PROJECT
+// =====================================================
+router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { name, data } = req.body;
+    const { name, data } = req.body
 
     const project = {
       id: uuidv4(),
-      userId: req.userId,
+      userId: req.user.id,
       name: name || 'Projeto Sem Nome',
       data,
       isPublic: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    };
+    }
 
-    projects.push(project);
+    projects.push(project)
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       project
-    });
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao criar projeto' });
+    return res.status(500).json({ error: 'Erro ao criar projeto' })
   }
-});
+})
 
-// Get user projects
-router.get('/', authenticate, async (req, res) => {
+// =====================================================
+// GET USER PROJECTS
+// =====================================================
+router.get('/', authMiddleware, async (req, res) => {
   try {
-    const userProjects = projects.filter(p => p.userId === req.userId);
-    
-    res.json({
+    const userProjects = projects.filter(
+      p => p.userId === req.user.id
+    )
+
+    return res.json({
       success: true,
-      projects: userProjects.sort((a, b) => 
-        new Date(b.updatedAt) - new Date(a.updatedAt)
+      projects: userProjects.sort(
+        (a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)
       )
-    });
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar projetos' });
+    return res.status(500).json({ error: 'Erro ao buscar projetos' })
   }
-});
+})
 
-// Get project by ID
-router.get('/:id', authenticate, async (req, res) => {
+// =====================================================
+// GET PROJECT BY ID
+// =====================================================
+router.get('/:id', authMiddleware, async (req, res) => {
   try {
-    const project = projects.find(p => 
-      p.id === req.params.id && p.userId === req.userId
-    );
+    const project = projects.find(
+      p => p.id === req.params.id && p.userId === req.user.id
+    )
 
     if (!project) {
-      return res.status(404).json({ error: 'Projeto não encontrado' });
+      return res.status(404).json({ error: 'Projeto não encontrado' })
     }
 
-    res.json({
+    return res.json({
       success: true,
       project
-    });
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar projeto' });
+    return res.status(500).json({ error: 'Erro ao buscar projeto' })
   }
-});
+})
 
-// Update project
-router.put('/:id', authenticate, async (req, res) => {
+// =====================================================
+// UPDATE PROJECT
+// =====================================================
+router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const projectIndex = projects.findIndex(p => 
-      p.id === req.params.id && p.userId === req.userId
-    );
+    const index = projects.findIndex(
+      p => p.id === req.params.id && p.userId === req.user.id
+    )
 
-    if (projectIndex === -1) {
-      return res.status(404).json({ error: 'Projeto não encontrado' });
+    if (index === -1) {
+      return res.status(404).json({ error: 'Projeto não encontrado' })
     }
 
-    projects[projectIndex] = {
-      ...projects[projectIndex],
+    projects[index] = {
+      ...projects[index],
       ...req.body,
       updatedAt: new Date().toISOString()
-    };
-
-    res.json({
-      success: true,
-      project: projects[projectIndex]
-    });
-  } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar projeto' });
-  }
-});
-
-// Delete project
-router.delete('/:id', authenticate, async (req, res) => {
-  try {
-    const projectIndex = projects.findIndex(p => 
-      p.id === req.params.id && p.userId === req.userId
-    );
-
-    if (projectIndex === -1) {
-      return res.status(404).json({ error: 'Projeto não encontrado' });
     }
 
-    projects.splice(projectIndex, 1);
+    return res.json({
+      success: true,
+      project: projects[index]
+    })
+  } catch (error) {
+    return res.status(500).json({ error: 'Erro ao atualizar projeto' })
+  }
+})
 
-    res.json({
+// =====================================================
+// DELETE PROJECT
+// =====================================================
+router.delete('/:id', authMiddleware, async (req, res) => {
+  try {
+    const index = projects.findIndex(
+      p => p.id === req.params.id && p.userId === req.user.id
+    )
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Projeto não encontrado' })
+    }
+
+    projects.splice(index, 1)
+
+    return res.json({
       success: true,
       message: 'Projeto deletado com sucesso'
-    });
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao deletar projeto' });
+    return res.status(500).json({ error: 'Erro ao deletar projeto' })
   }
-});
+})
 
-// Make project public/private
-router.patch('/:id/visibility', authenticate, async (req, res) => {
+// =====================================================
+// PUBLIC / PRIVATE
+// =====================================================
+router.patch('/:id/visibility', authMiddleware, async (req, res) => {
   try {
-    const { isPublic } = req.body;
-    
-    const projectIndex = projects.findIndex(p => 
-      p.id === req.params.id && p.userId === req.userId
-    );
+    const { isPublic } = req.body
 
-    if (projectIndex === -1) {
-      return res.status(404).json({ error: 'Projeto não encontrado' });
+    const index = projects.findIndex(
+      p => p.id === req.params.id && p.userId === req.user.id
+    )
+
+    if (index === -1) {
+      return res.status(404).json({ error: 'Projeto não encontrado' })
     }
 
-    projects[projectIndex].isPublic = isPublic;
-    projects[projectIndex].updatedAt = new Date().toISOString();
+    projects[index].isPublic = isPublic
+    projects[index].updatedAt = new Date().toISOString()
 
-    // Update public projects list
     if (isPublic) {
-      const publicProject = { ...projects[projectIndex] };
-      delete publicProject.userId; // Remove userId from public view
-      publicProjects.push(publicProject);
+      const pub = { ...projects[index] }
+      delete pub.userId
+      publicProjects.push(pub)
     } else {
-      const pubIndex = publicProjects.findIndex(p => p.id === req.params.id);
-      if (pubIndex !== -1) {
-        publicProjects.splice(pubIndex, 1);
-      }
+      const pubIndex = publicProjects.findIndex(p => p.id === req.params.id)
+      if (pubIndex !== -1) publicProjects.splice(pubIndex, 1)
     }
 
-    res.json({
+    return res.json({
       success: true,
-      project: projects[projectIndex]
-    });
+      project: projects[index]
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao atualizar visibilidade' });
+    return res.status(500).json({ error: 'Erro ao atualizar visibilidade' })
   }
-});
+})
 
-// Get public projects (library)
+// =====================================================
+// PUBLIC LIBRARY
+// =====================================================
 router.get('/public/library', async (req, res) => {
   try {
-    const publicProjectsList = projects
+    const list = projects
       .filter(p => p.isPublic)
       .map(p => ({
         id: p.id,
         name: p.name,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt
-      }));
+      }))
 
-    res.json({
+    return res.json({
       success: true,
-      projects: publicProjectsList
-    });
+      projects: list
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao buscar biblioteca pública' });
+    return res.status(500).json({ error: 'Erro ao buscar biblioteca pública' })
   }
-});
+})
 
-// Clone public project
-router.post('/clone/:id', authenticate, async (req, res) => {
+// =====================================================
+// CLONE PUBLIC PROJECT
+// =====================================================
+router.post('/clone/:id', authMiddleware, async (req, res) => {
   try {
-    const originalProject = projects.find(p => p.id === req.params.id && p.isPublic);
+    const original = projects.find(
+      p => p.id === req.params.id && p.isPublic
+    )
 
-    if (!originalProject) {
-      return res.status(404).json({ error: 'Projeto público não encontrado' });
+    if (!original) {
+      return res.status(404).json({ error: 'Projeto público não encontrado' })
     }
 
-    const clonedProject = {
-      ...originalProject,
+    const clone = {
+      ...original,
       id: uuidv4(),
-      userId: req.userId,
-      name: `${originalProject.name} (Cópia)`,
+      userId: req.user.id,
+      name: `${original.name} (Cópia)`,
       isPublic: false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
-    };
+    }
 
-    projects.push(clonedProject);
+    projects.push(clone)
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
-      project: clonedProject
-    });
+      project: clone
+    })
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao clonar projeto' });
+    return res.status(500).json({ error: 'Erro ao clonar projeto' })
   }
-});
+})
 
-export default router;
+export default router
