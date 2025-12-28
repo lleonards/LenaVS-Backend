@@ -3,7 +3,7 @@ import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
 import { v4 as uuidv4 } from 'uuid'
-import authMiddleware from '../middleware/auth.js'
+import { authenticate } from '../middleware/auth.js'
 import { processLyricsFile } from '../utils/lyricsProcessor.js'
 
 const router = express.Router()
@@ -24,7 +24,7 @@ const allowedTypes = {
   audio: /mp3|wav|ogg|m4a|aac|flac|wma/,
   video: /mp4|mov|avi|mkv/,
   image: /jpg|jpeg|png/,
-  lyrics: /txt|docx|pdf/,
+  lyrics: /txt|docx|pdf/
 }
 
 // --------------------------------------------------
@@ -58,7 +58,7 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => {
     const uniqueName = `${uuidv4()}${path.extname(file.originalname)}`
     cb(null, uniqueName)
-  },
+  }
 })
 
 // --------------------------------------------------
@@ -80,7 +80,7 @@ const upload = multer({
     }
 
     cb(null, true)
-  },
+  }
 })
 
 // ==================================================
@@ -88,7 +88,7 @@ const upload = multer({
 // ==================================================
 
 // AUDIO
-router.post('/audio', authMiddleware, upload.single('file'), (req, res) => {
+router.post('/audio', authenticate, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' })
@@ -100,8 +100,8 @@ router.post('/audio', authMiddleware, upload.single('file'), (req, res) => {
         filename: req.file.filename,
         path: `/uploads/audio/${req.file.filename}`,
         originalName: req.file.originalname,
-        size: req.file.size,
-      },
+        size: req.file.size
+      }
     })
   } catch (error) {
     console.error('Erro em /upload/audio:', error)
@@ -110,7 +110,7 @@ router.post('/audio', authMiddleware, upload.single('file'), (req, res) => {
 })
 
 // VIDEO / IMAGE
-router.post('/media', authMiddleware, upload.single('file'), (req, res) => {
+router.post('/media', authenticate, upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' })
@@ -125,8 +125,8 @@ router.post('/media', authMiddleware, upload.single('file'), (req, res) => {
         path: `/uploads/${type}/${req.file.filename}`,
         originalName: req.file.originalname,
         size: req.file.size,
-        type,
-      },
+        type
+      }
     })
   } catch (error) {
     console.error('Erro em /upload/media:', error)
@@ -135,7 +135,7 @@ router.post('/media', authMiddleware, upload.single('file'), (req, res) => {
 })
 
 // LYRICS FILE
-router.post('/lyrics', authMiddleware, upload.single('file'), async (req, res) => {
+router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'Nenhum arquivo enviado' })
@@ -148,9 +148,9 @@ router.post('/lyrics', authMiddleware, upload.single('file'), async (req, res) =
       file: {
         filename: req.file.filename,
         path: `/uploads/lyrics/${req.file.filename}`,
-        originalName: req.file.originalname,
+        originalName: req.file.originalname
       },
-      lyrics,
+      lyrics
     })
   } catch (error) {
     console.error('Erro em /upload/lyrics:', error)
@@ -159,9 +159,10 @@ router.post('/lyrics', authMiddleware, upload.single('file'), async (req, res) =
 })
 
 // LYRICS TEXT
-router.post('/lyrics/text', authMiddleware, (req, res) => {
+router.post('/lyrics/text', authenticate, (req, res) => {
   try {
     const { text } = req.body
+
     if (!text) {
       return res.status(400).json({ error: 'Texto não enviado' })
     }
@@ -173,8 +174,8 @@ router.post('/lyrics/text', authMiddleware, (req, res) => {
       lyrics: verses.map((verse, index) => ({
         id: uuidv4(),
         text: verse.trim(),
-        order: index,
-      })),
+        order: index
+      }))
     })
   } catch (error) {
     console.error('Erro em /upload/lyrics/text:', error)
