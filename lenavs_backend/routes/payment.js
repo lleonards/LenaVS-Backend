@@ -1,17 +1,17 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
+import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
 
 /**
  * PAYMENT ROUTES - STRUCTURE
- * (Integração futura com Stripe, Mercado Pago, etc.)
+ * Integração futura (Stripe, Mercado Pago, etc.)
  */
 
 // =====================================================
 // CREATE PAYMENT SESSION
 // =====================================================
-router.post('/create-session', authMiddleware, async (req, res) => {
+router.post('/create-session', authenticate, async (req, res) => {
   try {
     const { plan, amount, currency } = req.body
 
@@ -30,14 +30,14 @@ router.post('/create-session', authMiddleware, async (req, res) => {
 })
 
 // =====================================================
-// PAYMENT WEBHOOK (sem auth)
+// PAYMENT WEBHOOK (SEM AUTH)
+// ⚠️ IMPORTANTE: webhook NÃO usa authenticate
 // =====================================================
 router.post(
   '/webhook',
   express.raw({ type: 'application/json' }),
   async (req, res) => {
     try {
-      // Webhook futuro
       return res.json({ received: true })
     } catch (error) {
       return res.status(400).json({ error: 'Webhook error' })
@@ -48,7 +48,7 @@ router.post(
 // =====================================================
 // PAYMENT HISTORY
 // =====================================================
-router.get('/history', authMiddleware, async (req, res) => {
+router.get('/history', authenticate, async (req, res) => {
   try {
     return res.json({
       success: true,
@@ -64,7 +64,7 @@ router.get('/history', authMiddleware, async (req, res) => {
 // =====================================================
 // SUBSCRIPTION STATUS
 // =====================================================
-router.get('/subscription', authMiddleware, async (req, res) => {
+router.get('/subscription', authenticate, async (req, res) => {
   try {
     return res.json({
       success: true,
