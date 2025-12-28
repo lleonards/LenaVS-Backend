@@ -1,5 +1,6 @@
 import express from 'express'
 import { supabase } from '../utils/supabaseClient.js'
+import { authenticate } from '../middleware/auth.js'
 
 const router = express.Router()
 
@@ -18,7 +19,6 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'As senhas não coincidem' })
     }
 
-    // 1️⃣ Criar usuário no Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password
@@ -40,7 +40,6 @@ router.post('/register', async (req, res) => {
 
     const userId = data.user.id
 
-    // 2️⃣ Verificar se já existe na tabela users
     const { data: existingUser } = await supabase
       .from('users')
       .select('id')
@@ -54,11 +53,9 @@ router.post('/register', async (req, res) => {
       })
     }
 
-    // 3️⃣ Trial de 7 dias
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
-    // 4️⃣ Inserir usuário na tabela users
     const { error: dbError } = await supabase
       .from('users')
       .insert({
@@ -138,6 +135,22 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error(err)
     return res.status(500).json({ message: 'Erro interno do servidor' })
+  }
+})
+
+// =====================================================
+// VERIFY (ESSENCIAL PARA EVITAR TELA BRANCA)
+// =====================================================
+router.get('/verify', authenticate, async (req, res) => {
+  try {
+    return res.json({
+      success: true,
+      userId: req.userId
+    })
+  } catch (err) {
+    return res.status(401).json({
+      message: 'Sessão inválida'
+    })
   }
 })
 
