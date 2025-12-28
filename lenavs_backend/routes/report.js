@@ -1,13 +1,13 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
-// import { sendErrorReport } from '../utils/emailService.js' // (opcional / futuro)
+import { authenticate } from '../middleware/auth.js'
+// import { sendErrorReport } from '../utils/emailService.js' // (futuro)
 
 const router = express.Router()
 
 // =====================================================
 // SUBMIT ERROR / BUG REPORT
 // =====================================================
-router.post('/error', authMiddleware, async (req, res) => {
+router.post('/error', authenticate, async (req, res) => {
   try {
     const { subject, description, errorDetails, userAgent } = req.body
 
@@ -26,7 +26,7 @@ router.post('/error', authMiddleware, async (req, res) => {
       timestamp: new Date().toISOString()
     }
 
-    // Log (por enquanto)
+    // Log temporário
     console.log('🐞 Bug Report:', report)
 
     // 🔮 Futuro (email, webhook, Slack, etc.)
