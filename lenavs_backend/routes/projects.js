@@ -1,5 +1,5 @@
 import express from 'express'
-import authMiddleware from '../middleware/auth.js'
+import { authenticate } from '../middleware/auth.js'
 import { projects, publicProjects } from '../data/store.js'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -8,7 +8,7 @@ const router = express.Router()
 // =====================================================
 // CREATE PROJECT
 // =====================================================
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authenticate, async (req, res) => {
   try {
     const { name, data } = req.body
 
@@ -36,7 +36,7 @@ router.post('/', authMiddleware, async (req, res) => {
 // =====================================================
 // GET USER PROJECTS
 // =====================================================
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authenticate, async (req, res) => {
   try {
     const userProjects = projects.filter(
       p => p.userId === req.user.id
@@ -56,7 +56,7 @@ router.get('/', authMiddleware, async (req, res) => {
 // =====================================================
 // GET PROJECT BY ID
 // =====================================================
-router.get('/:id', authMiddleware, async (req, res) => {
+router.get('/:id', authenticate, async (req, res) => {
   try {
     const project = projects.find(
       p => p.id === req.params.id && p.userId === req.user.id
@@ -78,7 +78,7 @@ router.get('/:id', authMiddleware, async (req, res) => {
 // =====================================================
 // UPDATE PROJECT
 // =====================================================
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authenticate, async (req, res) => {
   try {
     const index = projects.findIndex(
       p => p.id === req.params.id && p.userId === req.user.id
@@ -106,7 +106,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 // =====================================================
 // DELETE PROJECT
 // =====================================================
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authenticate, async (req, res) => {
   try {
     const index = projects.findIndex(
       p => p.id === req.params.id && p.userId === req.user.id
@@ -130,7 +130,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 // =====================================================
 // PUBLIC / PRIVATE
 // =====================================================
-router.patch('/:id/visibility', authMiddleware, async (req, res) => {
+router.patch('/:id/visibility', authenticate, async (req, res) => {
   try {
     const { isPublic } = req.body
 
@@ -189,7 +189,7 @@ router.get('/public/library', async (req, res) => {
 // =====================================================
 // CLONE PUBLIC PROJECT
 // =====================================================
-router.post('/clone/:id', authMiddleware, async (req, res) => {
+router.post('/clone/:id', authenticate, async (req, res) => {
   try {
     const original = projects.find(
       p => p.id === req.params.id && p.isPublic
