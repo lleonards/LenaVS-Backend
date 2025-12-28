@@ -19,6 +19,7 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ message: 'As senhas não coincidem' })
     }
 
+    // Criar usuário no Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password
@@ -30,7 +31,6 @@ router.post('/register', async (req, res) => {
           message: 'Este email já está cadastrado'
         })
       }
-
       return res.status(400).json({ message: error.message })
     }
 
@@ -40,6 +40,7 @@ router.post('/register', async (req, res) => {
 
     const userId = data.user.id
 
+    // Verifica se já existe na tabela users
     const { data: existingUser } = await supabase
       .from('users')
       .select('id')
@@ -53,6 +54,7 @@ router.post('/register', async (req, res) => {
       })
     }
 
+    // Trial de 7 dias
     const trialEndsAt = new Date()
     trialEndsAt.setDate(trialEndsAt.getDate() + 7)
 
