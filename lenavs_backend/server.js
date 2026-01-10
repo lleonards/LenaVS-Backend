@@ -20,11 +20,13 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 10000
 
-// Resolve __dirname (ESM safe)
+// --------------------------------------------------
+// __dirname (ESM SAFE)
+// --------------------------------------------------
 const __dirname = path.resolve()
 
 // --------------------------------------------------
-// CREATE UPLOAD / EXPORT FOLDERS SAFELY
+// CREATE UPLOAD / EXPORT FOLDERS
 // --------------------------------------------------
 function ensureUploadStructure() {
   const folders = [
@@ -36,7 +38,7 @@ function ensureUploadStructure() {
     path.join(__dirname, 'exports'),
   ]
 
-  folders.forEach((folder) => {
+  folders.forEach(folder => {
     if (!fs.existsSync(folder)) {
       fs.mkdirSync(folder, { recursive: true })
       console.log('📁 Created folder:', folder)
@@ -60,7 +62,7 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true, limit: '50mb' }))
 
 // --------------------------------------------------
-// STATIC FILES
+// STATIC FILES (uploads / exports)
 // --------------------------------------------------
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/exports', express.static(path.join(__dirname, 'exports')))
@@ -87,13 +89,29 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/report', reportRoutes)
 
 // --------------------------------------------------
-// 404 HANDLER
+// FRONTEND (REACT SPA)
 // --------------------------------------------------
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl,
-  })
+
+// Pasta do build do React (Vite / CRA)
+const frontendPath = path.join(__dirname, 'dist')
+
+// Serve arquivos estáticos do frontend
+if (fs.existsSync(frontendPath)) {
+  app.use(express.static(frontendPath))
+}
+
+// SPA FALLBACK (ESSENCIAL PARA /login, /register, /editor)
+app.get('*', (req, res) => {
+  // Se for rota de API → 404 JSON
+  if (req.originalUrl.startsWith('/api')) {
+    return res.status(404).json({
+      error: 'Route not found',
+      path: req.originalUrl,
+    })
+  }
+
+  // Qualquer outra rota → React
+  res.sendFile(path.join(frontendPath, 'index.html'))
 })
 
 // --------------------------------------------------
