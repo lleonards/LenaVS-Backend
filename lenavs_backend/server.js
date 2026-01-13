@@ -22,42 +22,32 @@ const PORT = process.env.PORT || 10000
 const __dirname = path.resolve()
 
 // --------------------------------------------------
-// CREATE REQUIRED FOLDERS
+// CREATE FOLDERS
 // --------------------------------------------------
-function ensureFolders() {
-  const folders = [
-    'uploads',
-    'uploads/audio',
-    'uploads/video',
-    'uploads/images',
-    'uploads/lyrics',
-    'exports'
-  ]
+const folders = [
+  'uploads/audio',
+  'uploads/video',
+  'uploads/images',
+  'uploads/lyrics',
+  'exports',
+]
 
-  folders.forEach(folder => {
-    const fullPath = path.join(__dirname, folder)
-    if (!fs.existsSync(fullPath)) {
-      fs.mkdirSync(fullPath, { recursive: true })
-      console.log('📁 Created:', fullPath)
-    }
-  })
-}
-
-ensureFolders()
+folders.forEach(folder => {
+  const fullPath = path.join(__dirname, folder)
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true })
+  }
+})
 
 // --------------------------------------------------
 // MIDDLEWARES
 // --------------------------------------------------
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
-  credentials: true
-}))
-
+app.use(cors({ origin: '*', credentials: true }))
 app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+app.use(express.urlencoded({ extended: true }))
 
 // --------------------------------------------------
-// STATIC FILES (APENAS uploads / exports)
+// STATIC FILES
 // --------------------------------------------------
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/exports', express.static(path.join(__dirname, 'exports')))
@@ -66,11 +56,7 @@ app.use('/exports', express.static(path.join(__dirname, 'exports')))
 // HEALTH CHECK
 // --------------------------------------------------
 app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'LenaVS Backend',
-    env: process.env.NODE_ENV || 'development'
-  })
+  res.json({ status: 'ok' })
 })
 
 // --------------------------------------------------
@@ -84,12 +70,12 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/report', reportRoutes)
 
 // --------------------------------------------------
-// API 404 (JSON)
+// 404 API
 // --------------------------------------------------
 app.use((req, res) => {
   res.status(404).json({
-    error: 'API route not found',
-    path: req.originalUrl
+    error: 'Route not found',
+    path: req.originalUrl,
   })
 })
 
@@ -102,6 +88,5 @@ app.use(errorHandler)
 // START SERVER
 // --------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
-  console.log('🚀 LenaVS Backend running')
-  console.log('🌍 Port:', PORT)
+  console.log('🚀 Backend running on port', PORT)
 })
