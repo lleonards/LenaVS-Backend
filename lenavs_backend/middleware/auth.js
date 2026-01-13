@@ -1,28 +1,32 @@
-import { supabase } from '../utils/supabaseClient.js'
+import jwt from 'jsonwebtoken'
 
-export const authenticate = async (req, res, next) => {
+export function authenticate(req, res, next) {
+  const authHeader = req.headers.authorization
+
+  if (!authHeader) {
+    return res.status(401).json({
+      message: 'Token não fornecido'
+    })
+  }
+
+  const token = authHeader.split(' ')[1]
+
+  if (!token) {
+    return res.status(401).json({
+      message: 'Token inválido'
+    })
+  }
+
   try {
-    const authHeader = req.headers.authorization
+    const decoded = jwt.verify(token, process.env.JWT_SECRET)
 
-    if (!authHeader) {
-      return res.status(401).json({ message: 'Token não fornecido' })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-
-    const { data, error } = await supabase.auth.getUser(token)
-
-    if (error || !data?.user) {
-      return res.status(401).json({ message: 'Token inválido' })
-    }
-
-    // disponibiliza para as rotas
-    req.userId = data.user.id
-    req.user = data.user
+    req.userId = decoded.id
+    req.userEmail = decoded.email
 
     next()
-  } catch (err) {
-    console.error('Auth error:', err)
-    return res.status(401).json({ message: 'Não autorizado' })
+  } catch (error) {
+    return res.status(401).json({
+      message: 'Token expirado ou inválido'
+    })
   }
 }
