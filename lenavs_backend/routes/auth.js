@@ -15,47 +15,58 @@ router.post('/register', async (req, res) => {
 
     if (!name || !email || !password || !confirmPassword) {
       return res.status(400).json({
-        message: 'Preencha todos os campos'
+        message: 'Preencha todos os campos',
       })
     }
 
     if (password !== confirmPassword) {
       return res.status(400).json({
-        message: 'As senhas não coincidem'
+        message: 'As senhas não coincidem',
       })
     }
 
-    // Verifica se usuário já existe
-    const { data: existingUser } = await supabase
+    // 🔍 Verifica se usuário já existe (SEM single)
+    const { data: existingUser, error: findError } = await supabase
       .from('users')
       .select('id')
       .eq('email', email)
-      .single()
+      .maybeSingle()
+
+    if (findError) {
+      console.error('SUPABASE FIND USER ERROR:', findError)
+      return res.status(500).json({
+        message: 'Erro interno no servidor',
+      })
+    }
 
     if (existingUser) {
       return res.status(400).json({
-        message: 'Este email já está cadastrado'
+        message: 'Este email já está cadastrado',
       })
     }
 
     const hashedPassword = await bcrypt.hash(password, 10)
 
-    const { data: user, error } = await supabase
+    // ➕ Cria usuário
+    const { data: user, error: insertError } = await supabase
       .from('users')
       .insert([
         {
           name,
           email,
           password: hashedPassword,
-          trial_ends_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-        }
+          trial_ends_at: new Date(
+            Date.now() + 7 * 24 * 60 * 60 * 1000
+          ),
+        },
       ])
       .select()
       .single()
 
-    if (error) {
+    if (insertError || !user) {
+      console.error('SUPABASE INSERT ERROR:', insertError)
       return res.status(500).json({
-        message: 'Erro ao criar usuário'
+        message: 'Erro ao criar usuário',
       })
     }
 
@@ -69,13 +80,14 @@ router.post('/register', async (req, res) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
       },
-      token
+      token,
     })
   } catch (err) {
+    console.error('REGISTER ERROR:', err)
     return res.status(500).json({
-      message: 'Erro interno no servidor'
+      message: 'Erro interno no servidor',
     })
   }
 })
@@ -89,19 +101,27 @@ router.post('/login', async (req, res) => {
 
     if (!email || !password) {
       return res.status(400).json({
-        message: 'Email e senha são obrigatórios'
+        message: 'Email e senha são obrigatórios',
       })
     }
 
-    const { data: user } = await supabase
+    // 🔍 Busca usuário (SEM single)
+    const { data: user, error } = await supabase
       .from('users')
       .select('*')
       .eq('email', email)
-      .single()
+      .maybeSingle()
+
+    if (error) {
+      console.error('SUPABASE LOGIN ERROR:', error)
+      return res.status(500).json({
+        message: 'Erro interno no servidor',
+      })
+    }
 
     if (!user) {
       return res.status(400).json({
-        message: 'Email ou senha inválidos'
+        message: 'Email ou senha inválidos',
       })
     }
 
@@ -109,7 +129,7 @@ router.post('/login', async (req, res) => {
 
     if (!passwordMatch) {
       return res.status(400).json({
-        message: 'Email ou senha inválidos'
+        message: 'Email ou senha inválidos',
       })
     }
 
@@ -123,13 +143,14 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         name: user.name,
-        email: user.email
+        email: user.email,
       },
-      token
+      token,
     })
   } catch (err) {
+    console.error('LOGIN ERROR:', err)
     return res.status(500).json({
-      message: 'Erro interno no servidor'
+      message: 'Erro interno no servidor',
     })
   }
 })
@@ -138,19 +159,33 @@ router.post('/login', async (req, res) => {
 // ME (rota protegida)
 // ------------------------------------
 router.get('/me', authenticate, async (req, res) => {
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, name, email, trial_ends_at')
-    .eq('id', req.userId)
-    .single()
+  try {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, name, email, trial_ends_at')
+      .eq('id', req.userId)
+      .maybeSingle()
 
-  if (!user) {
-    return res.status(404).json({
-      message: 'Usuário não encontrado'
+    if (error) {
+      console.error('SUPABASE ME ERROR:', error)
+      return res.status(500).json({
+        message: 'Erro interno no servidor',
+      })
+    }
+
+    if (!user) {
+      return res.status(404).json({
+        message: 'Usuário não encontrado',
+      })
+    }
+
+    return res.json({ user })
+  } catch (err) {
+    console.error('ME ERROR:', err)
+    return res.status(500).json({
+      message: 'Erro interno no servidor',
     })
   }
-
-  return res.json({ user })
 })
 
 export default router
