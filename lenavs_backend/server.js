@@ -47,7 +47,7 @@ app.use(express.json({ limit: '50mb' }))
 app.use(express.urlencoded({ extended: true }))
 
 // --------------------------------------------------
-// STATIC FILES
+// STATIC FILES (uploads / exports)
 // --------------------------------------------------
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/exports', express.static(path.join(__dirname, 'exports')))
@@ -70,14 +70,21 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/report', reportRoutes)
 
 // --------------------------------------------------
-// 404 API
+// FRONTEND (SPA FALLBACK)
 // --------------------------------------------------
-app.use((req, res) => {
-  res.status(404).json({
-    error: 'Route not found',
-    path: req.originalUrl,
+const frontendPath = path.join(__dirname, 'dist')
+
+if (fs.existsSync(frontendPath)) {
+  // serve arquivos do React
+  app.use(express.static(frontendPath))
+
+  // qualquer rota que NÃO seja /api vai pro React
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendPath, 'index.html'))
   })
-})
+} else {
+  console.warn('⚠️ Pasta dist não encontrada. Frontend não será servido.')
+}
 
 // --------------------------------------------------
 // ERROR HANDLER
