@@ -40,14 +40,41 @@ folders.forEach(folder => {
 })
 
 // --------------------------------------------------
-// MIDDLEWARES
+// CORS CONFIG (CORRETO)
 // --------------------------------------------------
-app.use(cors({ origin: '*', credentials: true }))
-app.use(express.json({ limit: '50mb' }))
-app.use(express.urlencoded({ extended: true }))
+const allowedOrigins = [
+  'https://www.lenavs.com',
+  'https://lenavs.com',
+  'https://lenavs-frontend.onrender.com'
+]
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // permite chamadas sem origin (Postman, backend interno)
+    if (!origin) return callback(null, true)
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true)
+    }
+
+    return callback(new Error('Not allowed by CORS'))
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}))
+
+// Preflight (IMPORTANTÍSSIMO para upload)
+app.options('*', cors())
 
 // --------------------------------------------------
-// STATIC FILES (uploads / exports)
+// BODY PARSERS
+// --------------------------------------------------
+app.use(express.json({ limit: '50mb' }))
+app.use(express.urlencoded({ extended: true, limit: '50mb' }))
+
+// --------------------------------------------------
+// STATIC FILES
 // --------------------------------------------------
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/exports', express.static(path.join(__dirname, 'exports')))
@@ -75,10 +102,8 @@ app.use('/api/report', reportRoutes)
 const frontendPath = path.join(__dirname, 'dist')
 
 if (fs.existsSync(frontendPath)) {
-  // serve arquivos do React
   app.use(express.static(frontendPath))
 
-  // qualquer rota que NÃO seja /api vai pro React
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'))
   })
