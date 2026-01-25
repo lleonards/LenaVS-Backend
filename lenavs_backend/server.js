@@ -1,4 +1,4 @@
-ai esta o server.js "import express from 'express'
+import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -29,7 +29,7 @@ const folders = [
   'uploads/video',
   'uploads/images',
   'uploads/lyrics',
-  'exports',
+  'exports'
 ]
 
 folders.forEach(folder => {
@@ -40,32 +40,28 @@ folders.forEach(folder => {
 })
 
 // --------------------------------------------------
-// CORS CONFIG (CORRETO)
+// CORS CONFIG (SEGURO + FUNCIONAL)
 // --------------------------------------------------
 const allowedOrigins = [
+  'http://localhost:5173',
   'https://www.lenavs.com',
   'https://lenavs.com',
   'https://lenavs-frontend.onrender.com'
 ]
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // permite chamadas sem origin (Postman, backend interno)
+const corsOptions = {
+  origin: (origin, callback) => {
     if (!origin) return callback(null, true)
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true)
-    }
-
-    return callback(new Error('Not allowed by CORS'))
+    if (allowedOrigins.includes(origin)) return callback(null, true)
+    return callback(null, false)
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}))
+}
 
-// Preflight (IMPORTANTÍSSIMO para upload)
-app.options('*', cors())
+app.use(cors(corsOptions))
+app.options('*', cors(corsOptions))
 
 // --------------------------------------------------
 // BODY PARSERS
@@ -97,18 +93,15 @@ app.use('/api/payment', paymentRoutes)
 app.use('/api/report', reportRoutes)
 
 // --------------------------------------------------
-// FRONTEND (SPA FALLBACK)
+// FRONTEND FALLBACK (se existir dist)
 // --------------------------------------------------
 const frontendPath = path.join(__dirname, 'dist')
 
 if (fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath))
-
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'))
   })
-} else {
-  console.warn('⚠️ Pasta dist não encontrada. Frontend não será servido.')
 }
 
 // --------------------------------------------------
@@ -121,4 +114,4 @@ app.use(errorHandler)
 // --------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Backend running on port', PORT)
-})" me mande completo e corrigido
+})
