@@ -8,6 +8,11 @@ import { processLyricsFile } from '../utils/lyricsProcessor.js'
 
 const router = express.Router()
 
+// ==================================================
+// BASE DIR (Render safe)
+// ==================================================
+const BASE_UPLOAD_DIR = '/tmp/uploads'
+
 // --------------------------------------------------
 // ENSURE FOLDER
 // --------------------------------------------------
@@ -28,7 +33,7 @@ const allowedTypes = {
 }
 
 // --------------------------------------------------
-// DETECT UPLOAD TYPE BY ROUTE
+// DETECT UPLOAD TYPE
 // --------------------------------------------------
 function getUploadType(req) {
   if (req.path.includes('audio')) return 'audio'
@@ -42,17 +47,22 @@ function getUploadType(req) {
 // --------------------------------------------------
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const type = getUploadType(req)
+    try {
+      const type = getUploadType(req)
 
-    let folder = 'uploads/'
-    if (type === 'audio') folder += 'audio/'
-    else if (type === 'video') folder += 'video/'
-    else if (type === 'image') folder += 'images/'
-    else if (type === 'lyrics') folder += 'lyrics/'
-    else folder += 'general/'
+      let folder = BASE_UPLOAD_DIR
+      if (type === 'audio') folder += '/audio'
+      else if (type === 'video') folder += '/video'
+      else if (type === 'image') folder += '/images'
+      else if (type === 'lyrics') folder += '/lyrics'
+      else folder += '/general'
 
-    ensureFolder(folder)
-    cb(null, folder)
+      ensureFolder(folder)
+      cb(null, folder)
+    } catch (err) {
+      console.error('Erro ao criar pasta de upload:', err)
+      cb(err)
+    }
   },
 
   filename: (req, file, cb) => {
@@ -72,11 +82,12 @@ const upload = multer({
     const ext = path.extname(file.originalname).toLowerCase().slice(1)
 
     if (!allowedTypes[type]) {
-      return cb(new Error(`Tipo de upload desconhecido: ${type}`))
+      console.error('Tipo desconhecido:', type)
+      return cb(new Error('Tipo de upload inválido'))
     }
 
     if (!allowedTypes[type].test(ext)) {
-      return cb(new Error(`Tipo de arquivo não suportado para ${type}`))
+      return cb(new Error(`Arquivo não suportado para ${type}`))
     }
 
     cb(null, true)
@@ -87,100 +98,74 @@ const upload = multer({
 // ROUTES
 // ==================================================
 
-// AUDIO
 router.post('/audio', authenticate, upload.single('file'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' })
-    }
-
-    res.json({
-      success: true,
-      file: {
-        filename: req.file.filename,
-        path: `/uploads/audio/${req.file.filename}`,
-        originalName: req.file.originalname,
-        size: req.file.size
-      }
-    })
-  } catch (error) {
-    console.error('Erro em /upload/audio:', error)
-    res.status(500).json({ error: 'Erro ao enviar áudio' })
+  if (!req.file) {
+    console.error('UPLOAD AUDIO: req.file undefined')
+    return res.status(400).json({ error: 'Falha no upload do áudio' })
   }
+
+  res.json({
+    success: true,
+    file: {
+      filename: req.file.filename,
+      path: `/tmp/uploads/audio/${req.file.filename}`,
+      originalName: req.file.originalname,
+      size: req.file.size
+    }
+  })
 })
 
-// VIDEO / IMAGE
 router.post('/media', authenticate, upload.single('file'), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' })
-    }
-
-    const type = req.body.type === 'video' ? 'video' : 'images'
-
-    res.json({
-      success: true,
-      file: {
-        filename: req.file.filename,
-        path: `/uploads/${type}/${req.file.filename}`,
-        originalName: req.file.originalname,
-        size: req.file.size,
-        type
-      }
-    })
-  } catch (error) {
-    console.error('Erro em /upload/media:', error)
-    res.status(500).json({ error: 'Erro ao enviar mídia' })
+  if (!req.file) {
+    console.error('UPLOAD MEDIA: req.file undefined')
+    return res.status(400).json({ error: 'Falha no upload da mídia' })
   }
+
+  const type = req.body.type === 'video' ? 'video' : 'images'
+
+  res.json({
+    success: true,
+    file: {
+      filename: req.file.filename,
+      path: `/tmp/uploads/${type}/${req.file.filename}`,
+      originalName: req.file.originalname,
+      size: req.file.size,
+      type
+    }
+  })
 })
 
-// LYRICS FILE
 router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'Nenhum arquivo enviado' })
-    }
-
-    const lyrics = await processLyricsFile(req.file.path, req.file.mimetype)
-
-    res.json({
-      success: true,
-      file: {
-        filename: req.file.filename,
-        path: `/uploads/lyrics/${req.file.filename}`,
-        originalName: req.file.originalname
-      },
-      lyrics
-    })
-  } catch (error) {
-    console.error('Erro em /upload/lyrics:', error)
-    res.status(500).json({ error: 'Erro ao processar letra' })
+  if (!req.file) {
+    console.error('UPLOAD LYRICS FILE: req.file undefined')
+    return res.status(400).json({ error: 'Falha no upload da letra' })
   }
+
+  const lyrics = await processLyricsFile(req.file.path, req.file.mimetype)
+
+  res.json({
+    success: true,
+    lyrics
+  })
 })
 
-// LYRICS TEXT
 router.post('/lyrics/text', authenticate, (req, res) => {
-  try {
-    const { text } = req.body
+  const { text } = req.body
 
-    if (!text) {
-      return res.status(400).json({ error: 'Texto não enviado' })
-    }
-
-    const verses = text.split(/\n\s*\n/).filter(v => v.trim())
-
-    res.json({
-      success: true,
-      lyrics: verses.map((verse, index) => ({
-        id: uuidv4(),
-        text: verse.trim(),
-        order: index
-      }))
-    })
-  } catch (error) {
-    console.error('Erro em /upload/lyrics/text:', error)
-    res.status(500).json({ error: 'Erro ao processar letra' })
+  if (!text) {
+    return res.status(400).json({ error: 'Texto não enviado' })
   }
+
+  const verses = text.split(/\n\s*\n/).filter(v => v.trim())
+
+  res.json({
+    success: true,
+    lyrics: verses.map((verse, index) => ({
+      id: uuidv4(),
+      text: verse.trim(),
+      order: index
+    }))
+  })
 })
 
 export default router
