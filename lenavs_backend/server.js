@@ -40,28 +40,17 @@ folders.forEach(folder => {
 })
 
 // --------------------------------------------------
-// CORS CONFIG (SEGURO + FUNCIONAL)
+// CORS CONFIG (LIBERADO E FUNCIONAL)
 // --------------------------------------------------
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://www.lenavs.com',
-  'https://lenavs.com',
-  'https://lenavs-frontend.onrender.com'
-]
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin) return callback(null, true)
-    if (allowedOrigins.includes(origin)) return callback(null, true)
-    return callback(null, false)
-  },
+app.use(cors({
+  origin: true, // 🔥 aceita qualquer origem (necessário agora)
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}
+}))
 
-app.use(cors(corsOptions))
-app.options('*', cors(corsOptions))
+// Preflight (CRÍTICO para upload)
+app.options('*', cors())
 
 // --------------------------------------------------
 // BODY PARSERS
