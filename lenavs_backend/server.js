@@ -1,4 +1,4 @@
-import express from 'express'
+ai esta o server.js "import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
 import path from 'path'
@@ -121,4 +121,4 @@ app.use(errorHandler)
 // --------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log('🚀 Backend running on port', PORT)
-})
+})" me mande completo e corrigido
