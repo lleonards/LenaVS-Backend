@@ -9,7 +9,7 @@ import { processLyricsFile } from '../utils/lyricsProcessor.js'
 const router = express.Router()
 
 // ==================================================
-// BASE DIR (Render SAFE + SERVÍVEL)
+// BASE DIR (Render SAFE)
 // ==================================================
 const BASE_UPLOAD_DIR = path.resolve('uploads')
 
@@ -27,18 +27,17 @@ function ensureFolder(folder) {
 // --------------------------------------------------
 const allowedTypes = {
   audio: /mp3|wav|ogg|m4a|aac|flac|wma/,
-  video: /mp4|mov|avi|mkv/,
-  image: /jpg|jpeg|png/,
+  media: /mp4|mov|avi|mkv|jpg|jpeg|png/,
   lyrics: /txt|docx|pdf/
 }
 
 // --------------------------------------------------
-// DETECT UPLOAD TYPE
+// DETECT UPLOAD TYPE (SAFE)
 // --------------------------------------------------
 function getUploadType(req) {
-  if (req.path.includes('audio')) return 'audio'
-  if (req.path.includes('media')) return req.body.type
-  if (req.path.includes('lyrics')) return 'lyrics'
+  if (req.path.includes('/audio')) return 'audio'
+  if (req.path.includes('/media')) return 'media'
+  if (req.path.includes('/lyrics')) return 'lyrics'
   return 'general'
 }
 
@@ -50,9 +49,9 @@ const storage = multer.diskStorage({
     const type = getUploadType(req)
 
     let folder = BASE_UPLOAD_DIR
+
     if (type === 'audio') folder += '/audio'
-    else if (type === 'video') folder += '/video'
-    else if (type === 'image') folder += '/images'
+    else if (type === 'media') folder += '/media'
     else if (type === 'lyrics') folder += '/lyrics'
     else folder += '/general'
 
@@ -67,7 +66,7 @@ const storage = multer.diskStorage({
 })
 
 // --------------------------------------------------
-// MULTER CONFIG
+// MULTER CONFIG (NO SESSION BREAK)
 // --------------------------------------------------
 const upload = multer({
   storage,
@@ -77,7 +76,7 @@ const upload = multer({
     const ext = path.extname(file.originalname).toLowerCase().slice(1)
 
     if (!allowedTypes[type] || !allowedTypes[type].test(ext)) {
-      return cb(new Error('Tipo de arquivo não suportado'))
+      return cb(null, false)
     }
 
     cb(null, true)
@@ -91,7 +90,7 @@ const upload = multer({
 // AUDIO
 router.post('/audio', authenticate, upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'Falha no upload do áudio' })
+    return res.status(400).json({ error: 'Tipo de áudio não suportado' })
   }
 
   res.json({
@@ -108,19 +107,16 @@ router.post('/audio', authenticate, upload.single('file'), (req, res) => {
 // MEDIA (VIDEO / IMAGE)
 router.post('/media', authenticate, upload.single('file'), (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'Falha no upload da mídia' })
+    return res.status(400).json({ error: 'Tipo de mídia não suportado' })
   }
-
-  const type = req.body.type === 'video' ? 'video' : 'images'
 
   res.json({
     success: true,
     file: {
       filename: req.file.filename,
-      path: `/uploads/${type}/${req.file.filename}`,
+      path: `/uploads/media/${req.file.filename}`,
       originalName: req.file.originalname,
-      size: req.file.size,
-      type
+      size: req.file.size
     }
   })
 })
@@ -128,7 +124,7 @@ router.post('/media', authenticate, upload.single('file'), (req, res) => {
 // LYRICS FILE
 router.post('/lyrics', authenticate, upload.single('file'), async (req, res) => {
   if (!req.file) {
-    return res.status(400).json({ error: 'Falha no upload da letra' })
+    return res.status(400).json({ error: 'Tipo de arquivo de letra não suportado' })
   }
 
   const lyrics = await processLyricsFile(req.file.path, req.file.mimetype)
